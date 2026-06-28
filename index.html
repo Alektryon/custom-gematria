@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Custom Gematria Calculator</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0f0f1a;color:#e0e0e0;min-height:100vh;padding:20px}
+  .container{max-width:900px;margin:0 auto}
+  h1{text-align:center;font-size:2.2em;margin-bottom:8px;background:linear-gradient(90deg,#c9a44a,#f5d98a,#c9a44a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
+  .subtitle{text-align:center;color:#8a8a9a;margin-bottom:30px;font-size:.95em}
+  .input-panel{background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #2a2a4a;border-radius:12px;padding:28px;margin-bottom:24px;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+  .input-group{margin-bottom:18px}
+  .input-group label{display:block;margin-bottom:6px;font-weight:600;color:#c9a44a;font-size:.95em}
+  .input-group input{width:100%;padding:12px 16px;border:1px solid #2a2a4a;border-radius:8px;background:#0d0d1a;color:#f0f0f0;font-size:1.05em;outline:none;transition:border-color .3s}
+  .input-group input:focus{border-color:#c9a44a;box-shadow:0 0 8px rgba(201,164,74,.3)}
+  .calc-btn{width:100%;padding:14px;border:none;border-radius:8px;background:linear-gradient(135deg,#c9a44a,#a07830);color:#0f0f1a;font-size:1.1em;font-weight:700;cursor:pointer;letter-spacing:1px;transition:transform .15s,box-shadow .15s}
+  .calc-btn:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(201,164,74,.4)}
+  .calc-btn:active{transform:translateY(0)}
+  .error{color:#ff6b6b;margin-top:10px;font-size:.9em;display:none}
+  .results-section{margin-top:10px}
+  .results-header{font-size:1.3em;color:#c9a44a;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2a2a4a}
+  .result-card{background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #2a2a4a;border-radius:10px;margin-bottom:16px;overflow:hidden;transition:border-color .3s}
+  .result-card:hover{border-color:#c9a44a}
+  .card-header{background:rgba(201,164,74,.1);padding:14px 18px;font-weight:700;font-size:1.1em;color:#f5d98a;display:flex;align-items:center;gap:10px}
+  .card-header .badge{background:#c9a44a;color:#0f0f1a;padding:2px 10px;border-radius:20px;font-size:.8em}
+  .card-body{padding:14px 18px}
+  .letter-mappings{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .letter-map{background:#0d0d1a;border:1px solid #2a2a4a;border-radius:6px;padding:6px 10px;text-align:center;min-width:52px;transition:border-color .2s}
+  .letter-map.highlight{border-color:#c9a44a;background:rgba(201,164,74,.08)}
+  .letter-map .lt{font-size:1.2em;font-weight:700;color:#f5d98a;display:block}
+  .letter-map .lv{font-size:.95em;color:#9a9aaa;display:block;margin-top:2px}
+  .sum-line{margin-top:10px;padding-top:10px;border-top:1px solid #2a2a4a;font-size:.95em;color:#8a8aaa}
+  .sum-line strong{color:#f5d98a}
+  .no-results{text-align:center;padding:40px;color:#6a6a7a;font-size:1.1em}
+  .loading{text-align:center;padding:20px;color:#c9a44a;display:none}
+  @media(max-width:600px){
+    h1{font-size:1.6em}
+    .input-panel{padding:18px}
+    .letter-map{min-width:44px;padding:4px 7px}
+    .letter-map .lt{font-size:1em}
+    .letter-map .lv{font-size:.82em}
+  }
+</style>
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+<div class="container">
+  <h1>Custom Gematria Calculator</h1>
+  <p class="subtitle">Find all Base &amp; Progression values that yield a desired Gematria sum</p>
+
+  <div class="input-panel">
+    <div class="input-group">
+      <label for="phrase">Word or Phrase</label>
+      <input type="text" id="phrase" placeholder="e.g. HELLO WORLD" autocomplete="off">
+    </div>
+    <div class="input-group">
+      <label for="desired">Desired Value (0 – 10,000)</label>
+      <input type="number" id="desired" min="0" max="10000" placeholder="e.g. 326">
+    </div>
+    <button class="calc-btn" onclick="calculate()">Calculate</button>
+    <div class="error" id="error"></div>
+  </div>
+
+  <div class="loading" id="loading">Calculating…</div>
+  <div class="results-section" id="results"></div>
+</div>
+
+<script>
+function calculate(){
+  const phraseEl=document.getElementById('phrase');
+  const desiredEl=document.getElementById('desired');
+  const errorEl=document.getElementById('error');
+  const resultsEl=document.getElementById('results');
+  const loadingEl=document.getElementById('loading');
+
+  errorEl.style.display='none';
+  resultsEl.innerHTML='';
+  loadingEl.style.display='block';
+
+  const phrase=phraseEl.value.trim();
+  const desired=parseInt(desiredEl.value,10);
+
+  if(!phrase){showError('Please enter a word or phrase.');return}
+  if(isNaN(desired)||desired<0||desired>10000){showError('Desired value must be between 0 and 10,000.');return}
+
+  /* Extract unique letter positions (1-26 for A-Z) */
+  const letters={};
+  const positions=[];
+  const upper=phrase.toUpperCase();
+  for(let i=0;i<upper.length;i++){
+    const c=upper.charCodeAt(i);
+    if(c>=65&&c<=90){
+      const pos=c-64; // A=1 ... Z=26
+      if(!(pos in letters)){
+        letters[pos]=true;
+        positions.push(pos);
+      }
+    }
+  }
+  if(positions.length===0){showError('No letters found in the input.');return}
+
+  /* Gematria sum = Σ (base + progression*(pos-1)) over each letter in phrase
+     = n*base + progression * Σ(pos_i - 1)
+     where n = total number of A-Z letters (with repetition), and
+     Σ(pos_i-1) is summed over each letter occurrence in the phrase (with repetition).
+
+     For unique display we need the set of positions used. */
+
+  /* Count total letter occurrences and sum of (pos-1) */
+  let totalCount=0;
+  let sumPosMinusOne=0;
+  for(let i=0;i<upper.length;i++){
+    const c=upper.charCodeAt(i);
+    if(c>=65&&c<=90){
+      totalCount++;
+      sumPosMinusOne+=(c-65); // (pos-1)
+    }
+  }
+
+  /* desired = totalCount * base + progression * sumPosMinusOne
+     => progression = (desired - totalCount * base) / sumPosMinusOne
+
+     We need progression to be a non-negative integer (≥0).
+     Also base must be ≥1 (or ≥0 if we allow 0? Let's use base ≥ 1).
+     Additionally each letter value = base + progression*(pos-1) should be reasonable.
+     We'll allow progression ≥ 0. */
+
+  const results=[];
+
+  for(let base=1;base<=10000;base++){
+    const remainder=desired-totalCount*base;
+    if(remainder<0)break; // further bases only make it more negative
+    if(sumPosMinusOne===0){
+      /* All letters are 'A', so progression doesn't matter — only base matters.
+         desired = totalCount * base => base = desired / totalCount */
+      if(totalCount*base===desired && desired%totalCount===0 && base===desired/totalCount){
+        /* Any progression works; we'll list a few representative ones */
+        results.push({base,progression:0,anyProgression:true});
+      }
+      break; // only one base can work when sumPosMinusOne=0
+    }
+    if(remainder % sumPosMinusOne !==0) continue;
+    const progression=remainder/sumPosMinusOne;
+    if(progression<0) continue;
+    /* Cap to avoid absurdly large values */
+    if(progression>10000) continue;
+    results.push({base,progression,anyProgression:false});
+  }
+
+  loadingEl.style.display='none';
+
+  if(results.length===0){
+    resultsEl.innerHTML='<div class="no-results">No valid Base/Progression combinations found for this input.</div>';
+    return;
+  }
+
+  let html='<div class="results-header">Found '+results.length+' combination'+(results.length>1?'s':'')+'</div>';
+
+  results.forEach((r,idx)=>{
+    const b=r.base;
+    const p=r.progression;
+    const maxPos=Math.max(...Object.keys(letters).map(Number));
+
+    html+='<div class="result-card">';
+    html+='<div class="card-header"><span class="badge">#'+(idx+1)+'</span> Base = '+b+', Progression = '+p+(r.anyProgression?' (any progression)':'')+'</div>';
+    html+='<div class="card-body"><div class="letter-mappings">';
+
+    for(let pos=1;pos<=26;pos++){
+      const val=b+p*(pos-1);
+      const isUsed=pos in letters;
+      html+='<div class="letter-map'+(isUsed?' highlight':'')+'">';
+      html+='<span class="lt">'+String.fromCharCode(64+pos)+'</span>';
+      html+='<span class="lv">='+val+'</span>';
+      html+='</div>';
+    }
+
+    html+='</div>';
+
+    /* Show the sum computation */
+    const parts=[];
+    for(let i=0;i<upper.length;i++){
+      const c=upper.charCodeAt(i);
+      if(c>=65&&c<=90){
+        const pos=c-64;
+        const val=b+p*(pos-1);
+        parts.push(upper[i]+'='+val);
+      }
+    }
+    const sum=parts.reduce((s,p)=>{const v=parseInt(p.split('=')[1]);return s+v},0);
+    html+='<div class="sum-line">Sum: '+parts.join(' + ')+' = <strong>'+sum+'</strong></div>';
+
+    html+='</div></div>';
+  });
+
+  resultsEl.innerHTML=html;
+}
+
+function showError(msg){
+  document.getElementById('loading').style.display='none';
+  const e=document.getElementById('error');
+  e.textContent=msg;
+  e.style.display='block';
+}
+
+/* Allow Enter key to trigger calculation */
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter') calculate();
+});
+</script>
+</body>
+</html>
